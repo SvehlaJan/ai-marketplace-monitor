@@ -1,6 +1,7 @@
 import pytest
+from diskcache import Cache
 
-from ai_marketplace_monitor.ai import OllamaBackend, OllamaConfig
+from ai_marketplace_monitor.ai import AIResponse, OllamaBackend, OllamaConfig
 from ai_marketplace_monitor.facebook import FacebookItemConfig, FacebookMarketplaceConfig
 from ai_marketplace_monitor.listing import Listing
 
@@ -62,3 +63,26 @@ def test_extra_prompt(
     prompt = ollama.get_prompt(listing, item_config, marketplace_config)
     assert "Evaluate how well this listing" not in prompt
     assert "myprompt" in prompt
+
+
+def test_cached_rating_survives_search_count_increment(
+    temp_cache: Cache,
+    listing: Listing,
+    item_config: FacebookItemConfig,
+    marketplace_config: FacebookMarketplaceConfig,
+) -> None:
+    response = AIResponse(score=1, comment="Not a desk", name="gemini")
+    response.to_cache(listing, item_config, marketplace_config, local_cache=temp_cache)
+
+    item_config.searched_count += 1
+
+    assert (
+        AIResponse.from_cache(listing, item_config, marketplace_config, local_cache=temp_cache)
+        == response
+    )
+
+    item_config.description = "New requirements"
+    assert (
+        AIResponse.from_cache(listing, item_config, marketplace_config, local_cache=temp_cache)
+        is None
+    )

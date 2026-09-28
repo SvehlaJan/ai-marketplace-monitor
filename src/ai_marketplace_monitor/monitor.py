@@ -229,6 +229,20 @@ class MarketplaceMonitor:
                             item=item_config.name,
                         ),
                     )
+            if res.comment == AIResponse.NOT_EVALUATED:
+                if self.logger:
+                    self.logger.warning(
+                        f"[Skip] AI unavailable for {listing.title}; retrying on a later scan.",
+                        extra=aimm_event(
+                            "listing_skip",
+                            reason="ai_unavailable",
+                            listing_id=listing.id,
+                            title=listing.title,
+                            item=item_config.name,
+                        ),
+                    )
+                continue
+
             if item_config.rating:
                 acceptable_rating = item_config.rating[
                     0 if item_config.searched_count == 0 else -1

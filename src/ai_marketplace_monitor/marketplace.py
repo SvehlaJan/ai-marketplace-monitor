@@ -1,5 +1,5 @@
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from logging import Logger
 from typing import Any, Callable, Generator, Generic, List, Type, TypeVar
@@ -14,6 +14,7 @@ from .utils import (
     MonitorConfig,
     Translator,
     convert_to_seconds,
+    hash_dict,
     hilight,
 )
 
@@ -397,6 +398,13 @@ class ItemConfig(MarketItemCommonConfig):
 
     # the number of times that this item has been searched
     searched_count: int = 0
+
+    @property
+    def hash(self: "ItemConfig") -> str:
+        """Hash search criteria without the mutable scan counter."""
+        config = asdict(self)
+        config.pop("searched_count")
+        return hash_dict(config)
 
     # keywords is required, all others are optional
     search_phrases: List[str] = field(default_factory=list)
