@@ -372,7 +372,7 @@ class MarketplaceMonitor:
                     # wait for some time before next search
                     # interval (in minutes) can be defined both for the marketplace
                     # if there is any configuration file change, stop sleeping and search again
-                    scheduled = None
+                    scheduled_jobs = []
                     start_at_list = item_config.start_at or marketplace_config.start_at
                     if start_at_list is not None and start_at_list:
                         for start_at in start_at_list:
@@ -399,6 +399,7 @@ class MarketplaceMonitor:
                                         f"""{hilight("[Schedule]", "ss")} Scheduling to search for {item_config.name} every day at {start_at}"""
                                     )
                                 scheduled = schedule.every().day.at(start_at)
+                            scheduled_jobs.append(scheduled)
                     else:
                         search_interval = max(
                             item_config.search_interval
@@ -417,16 +418,18 @@ class MarketplaceMonitor:
                                 f"""{hilight("[Schedule]", "info")} Scheduling to search for {item_config.name} every {humanize.naturaldelta(search_interval)} {"" if search_interval == max_search_interval else f"to {humanize.naturaldelta(max_search_interval)}"}"""
                             )
                         scheduled = schedule.every(search_interval).to(max_search_interval).seconds
-                    if scheduled is None:
-                        raise ValueError(
-                            f"Cannot determine a schedule for {item_config.name} from configuration file."
-                        )
-                    scheduled.do(
-                        self.search_item,
-                        marketplace_config,
-                        marketplace,
-                        item_config,
-                    ).tag(item_config.name)
+                        scheduled_jobs.append(scheduled)
+                    for scheduled in scheduled_jobs:
+                        if scheduled is None:
+                            raise ValueError(
+                                f"Cannot determine a schedule for {item_config.name} from configuration file."
+                            )
+                        scheduled.do(
+                            self.search_item,
+                            marketplace_config,
+                            marketplace,
+                            item_config,
+                        ).tag(item_config.name)
 
     def handle_pause(self: "MarketplaceMonitor") -> None:
         """Handle interruption signal."""
@@ -546,10 +549,11 @@ class MarketplaceMonitor:
                 if doze(60, self.config_files, self.keyboard_monitor) == SleepStatus.BY_KEYBOARD:
                     self.keyboard_monitor.set_paused(True)
                 continue
-            # run all jobs at the first time, then on their own schedule
-            # we could have used schedule.run_all() but we would like to check if
-            # configuration file has been changed, if so, clear all jobs and restart
+            # Run interval jobs immediately; fixed start times wait for their clock time.
+            # Check for config changes after each immediate job.
             for job in schedule.get_jobs():
+                if job.at_time is not None:
+                    continue
                 job.run()
                 self.handle_pause()
                 # if configuration file has been changed, clear all scheduled jobs and restart
