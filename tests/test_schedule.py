@@ -60,9 +60,18 @@ def test_fixed_daily_times_wait_until_scheduled_time(
         def start(self) -> None:
             pass
 
+    logins = []
+
     class FakeMarketplace:
+        page = None
+
         def configure(self, *_: object, **__: object) -> None:
             pass
+
+        def login(self) -> None:
+            logins.append(True)
+
+    monkeypatch.setattr(monitor_module, "FacebookMarketplace", FakeMarketplace, raising=False)
 
     class StopAfterSchedulingError(Exception):
         pass
@@ -99,4 +108,5 @@ def test_fixed_daily_times_wait_until_scheduled_time(
         monitor.start_monitor()
 
     assert searches == []
+    assert logins == [True]
     assert len(scheduler.jobs) == 2

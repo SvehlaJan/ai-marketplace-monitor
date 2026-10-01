@@ -14,6 +14,7 @@ from rich.prompt import Prompt
 
 from .ai import AIBackend, AIResponse
 from .config import Config, supported_ai_backends, supported_marketplaces
+from .facebook import FacebookMarketplace
 from .listing import Listing
 from .marketplace import Marketplace, TItemConfig, TMarketplaceConfig
 from .notification import NotificationStatus
@@ -539,7 +540,14 @@ class MarketplaceMonitor:
         while True:
             self.handle_pause()
             self.schedule_jobs()
-            if not schedule.get_jobs():
+            jobs = schedule.get_jobs()
+            # An explicit clock-time schedule has no immediate search to open
+            # Facebook. Open its login page now so manual verification is possible.
+            if jobs and all(job.at_time is not None for job in jobs):
+                facebook = self.active_marketplaces.get("facebook")
+                if isinstance(facebook, FacebookMarketplace) and facebook.page is None:
+                    facebook.login()
+            if not jobs:
                 # this actually should not happen because at least one item is required for the configuration file
                 if self.logger:
                     self.logger.error(
